@@ -1,0 +1,26 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+jupyter = "*"
+notebook = "*"
+jupyterlab = "*"
+numpy = "*"
+pandas = "*"
+boto3 = "*"
+s3fs = "*"
+pyarrow = "*"
+fastparquet = "*"
+sklearn = "*"
+osmpythontools = "*"
+tqdm = "*"
+tensorflow = "*"
+pyyaml = "*"
+h5py = "*"
+
+[requires]
+python_version = "3.7"
