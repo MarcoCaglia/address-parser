@@ -1,3 +1,5 @@
+"""Creates and encodes data for use in address parser."""
+
 import numpy as np
 from tqdm import tqdm
 from numpy.testing import assert_almost_equal
@@ -6,14 +8,28 @@ from functools import reduce
 
 
 class AddressPermutator:
-    def __init__(self, addresses):
-        self.addresses = addresses
+    """Creates and encodes data for use in address parser."""
+
+    def __init__(self):
+        """Initialize address permutator."""
+        self.addresses = None
         self.encoding = None
         self.decoding = None
 
         self._validate_addresses()
 
-    def permutate(self, permutation_buckets=(0.6, 0.3, 0.1)):
+    def permutate(self, addresses, for_training=True,
+                  permutation_buckets=(0.6, 0.3, 0.1)):
+        """Create "messy" data from input standardized data.
+
+        Keyword Arguments:
+            permutation_buckets {tuple} -- Constructs the buckets for
+                                           permutation categories (default:
+                                           {(0.6, 0.3, 0.1)})
+
+        Returns:
+            tupe -- Tuple of tuples of training and target addresses.
+        """
         self._validate_permutation_buckets(permutation_buckets)
         random_seed = np.random.uniform(size=(len(self.addresses)))
         permutated_addresses = []
@@ -30,14 +46,21 @@ class AddressPermutator:
 
         return tuple(permutated_addresses), standard_addresses
 
-    def encode(self, permutated, standard):
+    def encode(self, permutated, standard=()):
+        """Encode addresses for use in address parser.
+
+        Arguments:
+            permutated {tuple} -- Addresses to be parsed
+
+        Keyword Arguments:
+            standard {tuple} -- Target addresses. Only needed for training
+                                (default: {()})
+
+        Returns:
+            tuple -- Tuple of arrays if y is given, otherwise just X.
+        """
         all_text = permutated + standard
         maxlen = len(max(all_text, key=len))
-
-        try:
-            assert len(permutated) == len(standard)
-        except AssertionError:
-            raise AssertionError('Iterables must have same length.')
 
         big_string = "".join(all_text)
         all_letters = tuple(set(big_string))
@@ -50,9 +73,17 @@ class AddressPermutator:
         X = self._assign_bools(permutated_long, maxlen, self.encoding)
         y = self._assign_bools(standard_long, maxlen, self.encoding)
 
-        return X, y
+        return X, y if len(y) > 0 else X
 
     def decode(self, encoded_matrix):
+        """Decode matrix of encoded addresses.
+
+        Arguments:
+            encoded_matrix {np.ndarray} -- Encoded matrixes.
+
+        Returns:
+            list -- List of clear strings.
+        """
         decoded = []
         for row in encoded_matrix:
             decode_map = map(lambda x: self.decoding[np.argmax(x)], row)
