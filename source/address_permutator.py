@@ -1,10 +1,11 @@
 """Creates and encodes data for use in address parser."""
 
-import numpy as np
-from tqdm import tqdm
-from numpy.testing import assert_almost_equal
-from random import shuffle, choice
 from functools import reduce
+from random import choice, shuffle
+
+import numpy as np
+from numpy.testing import assert_almost_equal
+from tqdm import tqdm
 
 
 class AddressPermutator:
