@@ -66,7 +66,7 @@ class AddressPermutator:
             tuple -- Tuple of arrays if y is given, otherwise just X.
         """
         all_text = permutated + standard if bool(standard) else permutated
-        maxlen = len(max(all_text, key=len))
+        maxlen = 200
 
         big_string = "".join(all_text)
         all_letters = tuple(set(big_string))
