@@ -70,9 +70,13 @@ class AddressPermutator:
 
         big_string = "".join(all_text)
         all_letters = tuple(set(big_string))
-
-        self.encoding = {key: value for value, key in enumerate(all_letters)}
-        self.decoding = {value: key for value, key in enumerate(all_letters)}
+        if self.encoding is None:
+            self.encoding = {
+                key: value for value, key in enumerate(all_letters)
+                }
+            self.decoding = {
+                value: key for value, key in enumerate(all_letters)
+                }
 
         permutated_long = [x.ljust(maxlen) for x in permutated]
         standard_long = [x.ljust(maxlen) for x in standard]
@@ -92,7 +96,10 @@ class AddressPermutator:
         """
         decoded = []
         for row in encoded_matrix:
-            decode_map = map(lambda x: self.decoding[np.argmax(x)], row)
+            decode_map = map(
+                lambda x: self.decoding[str(np.argmax(x))],
+                row
+                )
             decoded.append("".join(decode_map))
 
         return decoded

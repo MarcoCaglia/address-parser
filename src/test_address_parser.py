@@ -3,38 +3,32 @@ import unittest
 import pandas as pd
 
 from address_parser import AddressParser
-from address_permutator import AddressPermutator
 
 
 class TestAddressParser(unittest.TestCase):
-    def test_model_training(self):
+    def test_model_creation(self):
         parser = AddressParser(log_level=10)
+
+        test_path = '../data/openaddr-collected-europe/pt/countrywide.csv'
+
+        test_data = pd.read_csv(test_path).sample(100)
+
+        test_matrix = test_data[
+            ['STREET', 'NUMBER', 'POSTCODE', 'CITY']
+            ].values
+
+        test_body = map(
+            lambda x: f'{x[0]} {x[1]}, {x[2]} {x[3]}'.lower(),
+            test_matrix
+            )
+
         parser.fit_new_model(
-            train_path=(
-                '/home/marco/Documents/repositories/MarcoCaglia/'
-                'address-parser/data/openaddr-collected-europe/pt/'
-                'countrywide.csv'
-                ),
-            country='pt',
-            no_addresses=500,
-            epochs=5,
+            train_path=test_path,
+            country='test',
+            no_addresses=100,
             testing=True
         )
 
-    def test_runtime(self):
-        parser = AddressParser(log_level=10)
+        parser.load_resources(country='test', testing=True)
 
-        addresses = pd.read_csv(
-            '../data/openaddr-collected-europe/pt/countrywide.csv'
-            ).sample(50)
-        addresses = addresses[['STREET', 'NUMBER', 'POSTCODE', 'CITY']].values
-
-        permutator = AddressPermutator()
-        perm = permutator.permutate(
-            addresses,
-            for_training=False,
-            permutation_buckets=(0.25, 0.60, 0.15)
-            )
-
-        parser.load_resources(country='pt', testing=True)
-        parser.parse_addresses(perm)
+        parser.parse_addresses(list(test_body))

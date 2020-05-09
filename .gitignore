@@ -134,7 +134,7 @@ saved_model/
 cache/
 
 # Dev Notebooks
-.ipynb
+*.ipynb
 
 # logs
-.txt
+*.txt

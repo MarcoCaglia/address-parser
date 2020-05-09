@@ -1,6 +1,16 @@
+"""Address parser. Parses addresses based on list of "messy" addresses.
+
+Raises:
+    NoModelError: Model for requested country was not found.
+
+Returns:
+    list -- List of parsed addresses
+"""
+
 import json
 import logging
 from exceptions import NoModelError
+from itertools import chain
 
 import pandas as pd
 import tensorflow as tf
@@ -9,6 +19,8 @@ from tensorflow.keras.layers import (LSTM, Bidirectional, Dense, LeakyReLU,
                                      TimeDistributed)
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+import numpy as np
+import os
 
 from address_permutator import AddressPermutator
 
@@ -37,17 +49,35 @@ class AddressParser(AddressPermutator):
             country {str} -- ISO-2 country tag.
 
         Keyword Arguments:
-            no_addresses {int} -- Number of addresses to use (default: {250000})
+            no_addresses {int} -- Number of addresses to use (default:
+                                  {250000})
             epochs {int} -- Number of epochs (default: {5})
         """
         self.logger.info('Loading Training Data.')
-        address_table = pd.read_csv(train_path).sample(no_addresses)
+        address_table = pd.read_csv(train_path)
 
         const_matrix = address_table[
             ['STREET', 'NUMBER', 'POSTCODE', 'CITY']
             ].values
 
-        X, y = self.permutate(const_matrix, buckets)
+        text_body = map(
+            lambda x: f'{x[0]} {x[1]}, {x[2]} {x[3]}',
+            const_matrix
+            )
+        self.encoding, self.decoding = self._create_encoding(text_body)
+        self._save_encoding(
+            encoding=self.encoding,
+            decoding=self.decoding,
+            country=country
+        )
+        const_matrix_train = const_matrix[
+            np.random.choice(
+                const_matrix.shape[0],
+                no_addresses,
+                replace=False
+                ), :]
+
+        X, y = self.permutate(const_matrix_train, buckets)
         X, y = self.encode(X, y)
 
         X_train, X_test, y_train, y_test = train_test_split(
@@ -56,7 +86,7 @@ class AddressParser(AddressPermutator):
 
         model = self._generate_model(X, y)
 
-        history = model.fit(
+        _ = model.fit(
             X_train,
             y_train,
             epochs=epochs,
@@ -78,6 +108,8 @@ class AddressParser(AddressPermutator):
         Arguments:
             country {str} -- Country for which resources should be loaded.
         """
+        logging.info(f'Loading codes for country {country}.')
+        self.encoding, self.decoding = self._load_codes(country)
         logging.info(f'Loading Model for country {country}.')
         if not testing:
             path = f'./saved_model/{country}_model.h5'
@@ -92,7 +124,7 @@ class AddressParser(AddressPermutator):
             addresses {list} -- List of address strings to parse.
 
         Keyword Arguments:
-            country {[type]} -- Can be used to overwrite model for
+            country {str} -- Can be used to overwrite model for
                                 load_resources (default: {None}).
 
         Raises:
@@ -109,14 +141,39 @@ class AddressParser(AddressPermutator):
             else:
                 raise NoModelError('No model loaded.')
             self.load_model(country=country)
-        permutator = AddressPermutator()
         logging.info('Encoding passed addresses.')
-        X_test = permutator.encode(addresses)
+        X_test, _ = self.encode(addresses)
 
-        y_hat = self.model.predict(X_test)
-        decoded = permutator.decode(y_hat)
+        y_hat = self.model.predict(X_test.astype(float))
+        decoded = self.decode(y_hat)
 
         return decoded
+
+    @staticmethod
+    def _create_encoding(text_body):
+        text_body = "|".join(chain.from_iterable(text_body)).lower()
+        text_set = set(text_body)
+
+        encoding = {letter: value for value, letter in enumerate(text_set)}
+        decoding = {value: letter for value, letter in enumerate(text_set)}
+
+        return encoding, decoding
+
+    @staticmethod
+    def _save_encoding(encoding, decoding, country):
+        base_path = (
+            '/home/marco/Documents/repositories/MarcoCaglia/address-'
+            'parser/properties'
+                     )
+        if country not in os.listdir(base_path + '/'):
+            os.mkdir(base_path + '/' + country)
+        with open(f'{base_path}/{country}/encoding.json', 'w',
+                  encoding='utf8') as f:
+            json.dump(encoding, f, ensure_ascii=False)
+
+        with open(f'{base_path}/{country}/decoding.json', 'w',
+                  encoding='utf8') as f:
+            json.dump(decoding, f, ensure_ascii=False)
 
     @staticmethod
     def _generate_model(X, y):
@@ -124,20 +181,19 @@ class AddressParser(AddressPermutator):
 
         model = Sequential()
 
-        model.add(LSTM(
+        model.add(Bidirectional(LSTM(
             512,
             return_sequences=True,
-            input_shape=(len(X[0]), len(X[0][0]))
-                ))
+            ), input_shape=(X.shape[1], X.shape[2])))
         model.add(LeakyReLU())
 
-        model.add(LSTM(256, return_sequences=True))
+        model.add(Bidirectional(LSTM(256, return_sequences=True)))
         model.add(LeakyReLU())
 
         model.add(TimeDistributed(Dense(128)))
         model.add(LeakyReLU())
 
-        model.add(TimeDistributed(Dense(len(X[0][0]), activation='softmax')))
+        model.add(TimeDistributed(Dense(X.shape[2], activation='softmax')))
 
         optimizer = Adam(lr=0.01)
 
@@ -151,3 +207,18 @@ class AddressParser(AddressPermutator):
         model.summary()
 
         return model
+
+    @staticmethod
+    def _load_codes(country):
+        base_path = (
+            '/home/marco/Documents/repositories/MarcoCaglia/address-'
+            'parser/properties'
+                     )
+
+        with open(f'{base_path}/{country}/encoding.json', 'r') as f:
+            encoding = json.load(f)
+
+        with open(f'{base_path}/{country}/decoding.json', 'r') as f:
+            decoding = json.load(f)
+
+        return encoding, decoding
